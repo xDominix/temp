@@ -23,10 +23,14 @@ export class HandDeck //ex. [card, card, null, null, card]
     this.cards[index]= null;
     return this;
   }
-  isEmpty(){
-    return this.cards.filter(a=>a===null).length === this.cards.length;
-  }
 
+  //
+  getRandomIndex(nullable=false){
+    let cnt = 0;
+    getCards().forEach(card => { if(card!==null) cnt++; });
+    if(nullable && getRandom(cnt+1)===cnt) return null; 
+    return getRandom(cnt);
+  }
 }
 
 export class TableDeck
@@ -34,7 +38,7 @@ export class TableDeck
   constructor(size,handDeck1,handDeck2,tableDeck)
   {
     this.cards = !tableDeck ? getRandomTableCards(size,handDeck1,handDeck2) : this.cards = tableDeck.toArray();
-}
+  }
 
   static New(size,handDeck1,handDeck2){
     return new TableDeck(size,handDeck1,handDeck2,null);
@@ -81,6 +85,10 @@ var getRandomTableCards = function(size,handDeck1,handDeck2)
     }
   }
   return res;
+}
+
+const getRandom =(range)=>{//return number between 0 - (range-1)
+  return Math.floor(Math.random()*range);
 }
 
 //local of local

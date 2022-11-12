@@ -33,6 +33,8 @@ const CGame = () => {
     const [isAcceptable,setIsAcceptable] = useState(false);
     var myAcceptedIndex = null;
     var opAcceptedIndex = null;
+    const setMyAcceptedIndex=(index)=>{ myAcceptedIndex=index; myAccept=true; tryEndRound();   }
+    const setOpAcceptedIndex=(index)=>{ opAcceptedIndex= index; opAccept=true; tryEndRound(); }
     var myAccept = false;
     var opAccept = false;
     var opSimulation;
@@ -42,8 +44,9 @@ const CGame = () => {
     var handleTimerEnd;//function
 
     const [gameStatus,setGameStatus]=useState([]);//true -myWin, false, opWin
-    const [tableHands,setTableHands]=useState([]);
-    
+    const [tableHands,setTableHands]=useState([]);// {up:card, down:card}
+    var round = 0;
+
     useEffect(()=>{
         const timeout = setTimeout(()=>{
             setIsAcceptable(true);//op player join
@@ -78,20 +81,22 @@ const CGame = () => {
     };
 
     const handleOnAccept=(index)=>{
-        if(!myHandDeck) IReady();
-        else 
-        {
-            myAcceptedIndex = index;
-            myAccept = true;
-            tryEndRound();
-        }
-
         setIsAcceptable(false);
+        if(!myHandDeck) IReady();
+        else  setMyAcceptedIndex(index);
     }
 
     const startRound =()=>{
+        //pokazanie kart
+        setTableFlop(Flop.New(tableFlop).showNext())
+
+       //wlaczenie dotykalnosci
+       setIsAcceptable(true);
+
+        //zaczecie myslenia
         simulateOp();
-        setIsAcceptable(true);
+
+       //end
         restartTimer(()=>{
             setIsTimerActive(false);
             clearInterval(opSimulation);
@@ -102,23 +107,30 @@ const CGame = () => {
 
         if((myAccept && opAccept) || force)
         {
+            //wymusza akceptujace karty
+            if(!game.noCardAccept)
+            {
+                if(!myAcceptedIndex)myAcceptedIndex = myHandDeck.getRandomIndex(false)
+                if(!opAcceptedIndex)opAcceptedIndex = opHandDeck.getRandomIndex(false)
+            }
+
+            //pokazuje karte oponenta
+            if(opAcceptedIndex) setOpFlop(Flop.Copy(opFlop).show(opAcceptedIndex))
+            
             restartTimer(()=>{
 
-                //wymusza akceptujace karty
-                if(!game.noCardAccept)
-                {
-                    if(!myAcceptedIndex)myAcceptedIndex = getMyAcceptedIndexRandom();
-                    if(!opAcceptedIndex)opAcceptedIndex = getOpAcceptedIndexRandom(noCardAccept);
-                }
-
-                //pokazuje karte oponenta
-                if(opAcceptedIndex) setOpFlop(Flop.Copy(opFlop).show(opAcceptedIndex))
-                
-                //dodaje do tableHands
+                let myCard = myAcceptedIndex ? myHandDeck.getCard(myAcceptedIndex) : null;
+                let opCard = opAcceptedIndex ? opHandDeck.getCard(opAcceptedIndex):null;
+                let domColor = tableDeck.getCard(round).color;
 
                 //dodaje do gameStatus
-
-                //calculate results
+                if(!myCard && opCard)            setGameStatus([...gameStatus].push(false));
+                else if(myCard && !opCard)    setGameStatus([...gameStatus].push(true));
+                else if(!myCard && !opCard)   setGameStatus([...gameStatus].push(domColor===myColor)); //"red" === "red"
+                else                                              setGameStatus([...gameStatus].push(myCard.isGreater(opCard,domColor)));
+            
+                //dodaje do tableHands
+                setTableHands([...tableHands].push({up:opCard,down:myCard}));... // dopisac do CTable o rodzaju tablicy, pamietaj ze moga byc nullowe
 
                 //zerowanko
                 myAcceptedIndex = null;
@@ -126,7 +138,29 @@ const CGame = () => {
                 myAccept = false;
                 opAccept = false;
 
-                //jesli to byla ostatnia to...
+                round++;
+
+                if(round === game.tableDeckSize)
+                {
+                    let price = countWinningPrice();
+                    if(price > game.enterPrice)
+                    {
+                        "You win: "+price+"$! " "GGs"
+                    }
+                    else if(price === game.enterPrice)
+                    {
+                        "You win: "+price+"$" "Even gameplay"
+                    }
+                    else
+                    {
+                        "You win: "+price+"$" "Could be better..."
+                    }
+                    -->button powrot, zagraj ponownie albo cos
+                    
+                    chargeBalance(price);
+                    
+                }
+                else startRound();
             },5);
         }
         else
@@ -139,9 +173,7 @@ const CGame = () => {
         opSimulation = setInterval(()=>{
             if((myAccept && getRandom(3)===1) || getRandom(game.roundTime/5)===1)// przez 5 bo 5 sekund
             {
-                opAcceptedIndex = getOpAcceptedIndexRandom(game.noCardAccept);
-                opAccept=true;
-                tryEndRound() === //to jakos dziwnie wyglada, czemu oponent sie pyta ze zakonczyc, to gra powinna robic automatycznie, staty trzeba rozwazyc
+                setOpAcceptedIndex(opHandDeck.getRandomIndex(game.noCardAccept));
             }
         },5);
     }
@@ -153,12 +185,12 @@ const CGame = () => {
         handleTimerEnd = handler;
     }
 
-    const getMyAcceptedIndexRandom=(nullable=false)=>{
-        //todo
-    }
-
-    const getOpAcceptedIndexRandom=(nullable)=>{
-        //todo
+    const countWinningPrice = () =>{
+        let price = 0;
+        game.bids.forEach((bid,index) => {
+            if(gameStatus[index]) price+= bid;
+        });
+        return price;
     }
 
     return ( 
